@@ -1,36 +1,45 @@
 package gregtech.api.metatileentity;
 
-import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
+import gregtech.api.interfaces.tileentity.IGTEnet;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.interfaces.tileentity.IHasWorldObjectAndCoords;
+import gregtech.api.interfaces.tileentity.IIC2Enet;
 import gregtech.api.net.GT_Packet_Block_Event;
 import gregtech.api.util.GT_LanguageManager;
 import gregtech.api.util.GT_Utility;
 import ic2.api.energy.event.EnergyTileLoadEvent;
 import ic2.api.energy.event.EnergyTileUnloadEvent;
 import net.minecraft.block.Block;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.init.Blocks;
 import net.minecraft.inventory.IInventory;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.tileentity.TileEntity;
+import net.minecraft.util.ChunkCoordinates;
+import net.minecraft.util.MathHelper;
 import net.minecraft.world.World;
 import net.minecraft.world.biome.BiomeGenBase;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.common.util.ForgeDirection;
 import net.minecraftforge.fluids.IFluidHandler;
 
+import java.util.Arrays;
 import java.util.concurrent.ThreadLocalRandom;
 
+import static gregtech.api.enums.GT_Values.ALL_VALID_SIDES;
+import static gregtech.api.enums.GT_Values.COMPASS_DIRECTIONS;
 import static gregtech.api.enums.GT_Values.GT;
 import static gregtech.api.enums.GT_Values.NW;
+import static gregtech.api.enums.GT_Values.SIDE_DOWN;
+import static gregtech.api.enums.GT_Values.SIDE_UP;
 
 /**
  * The Functions my old TileEntities and my BaseMetaTileEntities have in common.
  * <p/>
  * Basically everything a TileEntity should have.
  */
-public abstract class BaseTileEntity extends TileEntity implements IHasWorldObjectAndCoords {
+public abstract class BaseTileEntity extends TileEntity implements IHasWorldObjectAndCoords, IIC2Enet, IGTEnet {
     /**
      * Buffers adjacent TileEntities for faster access
      * <p/>
@@ -48,7 +57,21 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
      */
     public boolean isDead = false;
 
-    private final void clearNullMarkersFromTileEntityBuffer() {
+    private final ChunkCoordinates mReturnedCoordinates = new ChunkCoordinates();
+
+    public static byte getSideForPlayerPlacing(Entity aPlayer, byte aDefaultFacing, boolean[] aAllowedFacings) {
+        if(aPlayer != null) {
+            if (aPlayer.rotationPitch >= 65 && aAllowedFacings[SIDE_UP]) return SIDE_UP;
+            if (aPlayer.rotationPitch <= -65 && aAllowedFacings[SIDE_DOWN]) return SIDE_DOWN;
+            final byte rFacing = COMPASS_DIRECTIONS[MathHelper.floor_double(0.5D + 4.0F * aPlayer.rotationYaw / 360.0F) & 0x3];
+            if (aAllowedFacings[rFacing]) return rFacing;
+        }
+        for (final byte tSide : ALL_VALID_SIDES) if (aAllowedFacings[tSide]) return tSide;
+        return aDefaultFacing;
+    }
+
+
+    private void clearNullMarkersFromTileEntityBuffer() {
         for (int i = 0; i < mBufferedTileEntities.length; i++)
             if (mBufferedTileEntities[i] == this) mBufferedTileEntities[i] = null;
     }
@@ -57,7 +80,7 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
      * Called automatically when the Coordinates of this TileEntity have been changed
      */
     protected final void clearTileEntityBuffer() {
-        for (int i = 0; i < mBufferedTileEntities.length; i++) mBufferedTileEntities[i] = null;
+        Arrays.fill(mBufferedTileEntities, null);
     }
 
     @Override
@@ -78,6 +101,14 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
     @Override
     public final int getZCoord() {
         return zCoord;
+    }
+
+    @Override
+    public ChunkCoordinates getCoords() {
+        mReturnedCoordinates.posX = xCoord;
+        mReturnedCoordinates.posY = yCoord;
+        mReturnedCoordinates.posZ = zCoord;
+        return mReturnedCoordinates;
     }
 
     @Override
@@ -118,7 +149,12 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
     }
 
     @Override
-    public final int getRandomNumber(int aRange) {
+    public boolean isInvalidTileEntity() {
+        return isInvalid();
+    }
+
+    @Override
+    public int getRandomNumber(int aRange) {
         return ThreadLocalRandom.current().nextInt(aRange);
     }
 
@@ -323,6 +359,12 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
         return worldObj.getBlock(aX, aY, aZ);
     }
 
+    public Block getBlock(ChunkCoordinates aCoords) {
+        if (worldObj == null) return Blocks.air;
+        if (ignoreUnloadedChunks && crossedChunkBorder(aCoords) && !worldObj.blockExists(aCoords.posX, aCoords.posY, aCoords.posZ)) return Blocks.air;
+        return worldObj.getBlock(aCoords.posX, aCoords.posY, aCoords.posZ);
+    }
+    
     @Override
     public final byte getMetaID(int aX, int aY, int aZ) {
         if (ignoreUnloadedChunks && crossedChunkBorder(aX, aZ) && !worldObj.blockExists(aX, aY, aZ)) return 0;
@@ -354,7 +396,7 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
     }
 
     @Override
-    public final TileEntity getTileEntity(int aX, int aY, int aZ) {
+    public TileEntity getTileEntity(int aX, int aY, int aZ) {
         if (ignoreUnloadedChunks && crossedChunkBorder(aX, aZ) && !worldObj.blockExists(aX, aY, aZ)) return null;
         return worldObj.getTileEntity(aX, aY, aZ);
     }
@@ -388,7 +430,6 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
     @Override
     public void writeToNBT(NBTTagCompound aNBT) {
         super.writeToNBT(aNBT);
-        //isDead = true;
     }
 
     @Override
@@ -429,18 +470,18 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
 
     public void updateNeighbours(int mStrongRedstone, int oStrongRedstone) {
         Block thisBlock = getBlockOffset(0, 0, 0);
-        for (ForgeDirection dir : ForgeDirection.VALID_DIRECTIONS) {
-            int x1 = xCoord + dir.offsetX, y1 = yCoord + dir.offsetY, z1 = zCoord + dir.offsetZ;
+        for (final ForgeDirection dir : ForgeDirection.VALID_DIRECTIONS) {
+            final int x1 = xCoord + dir.offsetX, y1 = yCoord + dir.offsetY, z1 = zCoord + dir.offsetZ;
 
             if (worldObj.blockExists(x1, y1, z1)) {
                 worldObj.notifyBlockOfNeighborChange(x1, y1, z1, thisBlock);
 
-                //update if it was / is strong powered.
+                // update if it was / is strong powered.
                 if (((((mStrongRedstone | oStrongRedstone) >>> dir.ordinal()) & 1) != 0 ) && getBlock(x1, y1, z1).isNormalCube()) {
                     int skipUpdateSide = dir.getOpposite().ordinal(); //Don't update this block. Still updates diagonal blocks twice if conditions meet.
 
-                    for (ForgeDirection dir2 : ForgeDirection.VALID_DIRECTIONS) {
-                        int x2 = x1 + dir2.offsetX, y2 = y1 + dir2.offsetY, z2 = z1 + dir2.offsetZ;
+                    for (final ForgeDirection dir2 : ForgeDirection.VALID_DIRECTIONS) {
+                        final int x2 = x1 + dir2.offsetX, y2 = y1 + dir2.offsetY, z2 = z1 + dir2.offsetZ;
                         if (dir2.ordinal() != skipUpdateSide && worldObj.blockExists(x2, y2, z2))
                             worldObj.notifyBlockOfNeighborChange(x2, y2, z2, thisBlock);
                     }
@@ -454,8 +495,12 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
         NW.sendPacketToAllPlayersInRange(worldObj, new GT_Packet_Block_Event(xCoord, (short) yCoord, zCoord, aID, aValue), xCoord, zCoord);
     }
 
-    private boolean crossedChunkBorder(int aX, int aZ) {
+    protected boolean crossedChunkBorder(int aX, int aZ) {
         return aX >> 4 != xCoord >> 4 || aZ >> 4 != zCoord >> 4;
+    }
+    
+    public final boolean crossedChunkBorder(ChunkCoordinates aCoords) {
+        return aCoords.posX >> 4 != xCoord >> 4 || aCoords.posZ >> 4 != zCoord >> 4;
     }
 
     public final void setOnFire() {
@@ -479,8 +524,6 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
      */
     protected TileIC2EnergySink ic2EnergySink = null;
     protected boolean joinedIc2Enet = false;
-
-    public IMetaTileEntity getMetaTileEntity() { return null; }
 
     protected void createIc2Sink() {
         if(ic2EnergySink == null && isServerSide() && shouldJoinIc2Enet()) {
@@ -511,8 +554,4 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
         }
     }
 
-    public boolean shouldJoinIc2Enet() {
-        final IMetaTileEntity meta = getMetaTileEntity();
-        return meta != null && meta.shouldJoinIc2Enet();
-    }
 }

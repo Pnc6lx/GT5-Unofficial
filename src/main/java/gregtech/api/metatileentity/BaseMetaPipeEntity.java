@@ -11,6 +11,7 @@ import java.util.UUID;
 
 import gregtech.GT_Mod;
 import gregtech.api.GregTech_API;
+import gregtech.api.enums.GT_Values;
 import gregtech.api.enums.Textures;
 import gregtech.api.enums.Textures.BlockIcons;
 import gregtech.api.graphs.Lock;
@@ -19,6 +20,7 @@ import gregtech.api.graphs.paths.NodePath;
 import gregtech.api.interfaces.ITexture;
 import gregtech.api.interfaces.metatileentity.IConnectable;
 import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
+import gregtech.api.interfaces.tileentity.IDebugableTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.interfaces.tileentity.IPipeRenderedTileEntity;
 import gregtech.api.net.GT_Packet_TileEntity;
@@ -54,14 +56,13 @@ import static gregtech.api.metatileentity.BaseMetaTileEntity.COVER_DATA_NBT_KEYS
  * <p/>
  * This is the main TileEntity for EVERYTHING.
  */
-public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements IGregTechTileEntity, IPipeRenderedTileEntity {
+public class BaseMetaPipeEntity extends CommonMetaTileEntity implements IGregTechTileEntity, IPipeRenderedTileEntity, IDebugableTileEntity {
     public byte mConnections = IConnectable.NO_CONNECTION;
     protected MetaPipeEntity mMetaTileEntity;
-    private byte[] mSidedRedstone = new byte[]{0, 0, 0, 0, 0, 0};
     private int[] mTimeStatistics = new int[GregTech_API.TICKS_FOR_LAG_AVERAGING];
-    private boolean mInventoryChanged = false, mWorkUpdate = false, mWorks = true, mNeedsUpdate = true, mNeedsBlockUpdate = true, mSendClientData = false;
+    private boolean mWorkUpdate = false, mWorks = true;
     private final boolean mCheckConnections = false;
-    private byte mColor = 0, oColor = 0, mStrongRedstone = 0, oStrongRedstone = 0, oRedstoneData = 63, oTextureData = 0, oUpdateData = 0, mLagWarningCount = 0;
+    private byte mColor = 0, oColor = 0, oStrongRedstone = 0, oRedstoneData = 63, oTextureData = 0, oUpdateData = 0, mLagWarningCount = 0;
     private int oX = 0, oY = 0, oZ = 0, mTimeStatisticsIndex = 0;
     protected Node node;
     protected NodePath nodePath;
@@ -119,20 +120,16 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         try {
             super.writeToNBT(aNBT);
         } catch (Throwable e) {
-            GT_Log.err.println("Encountered CRITICAL ERROR while saving MetaTileEntity, the Chunk whould've been corrupted by now, but I prevented that. Please report immediately to GregTech Intergalactical!!!");
-            e.printStackTrace(GT_Log.err);
+            GT_FML_LOGGER.error("Encountered CRITICAL ERROR while saving MetaTileEntity", e);
         }
         try {
             aNBT.setInteger("mID", mID);
-            saveCoverNBT(aNBT);
-            aNBT.setByteArray("mRedstoneSided", mSidedRedstone);
+            writeCoverNBT(aNBT, false);
             aNBT.setByte("mConnections", mConnections);
             aNBT.setByte("mColor", mColor);
-            aNBT.setByte("mStrongRedstone", mStrongRedstone);
             aNBT.setBoolean("mWorks", !mWorks);
         } catch (Throwable e) {
-            GT_Log.err.println("Encountered CRITICAL ERROR while saving MetaTileEntity, the Chunk would've been corrupted by now, but I prevented that. Please report immediately to GregTech Intergalactical!!!");
-            e.printStackTrace(GT_Log.err);
+            GT_FML_LOGGER.error("Encountered CRITICAL ERROR while saving MetaTileEntity", e);
         }
         saveMetaTileNBT(aNBT);
     }
@@ -152,15 +149,13 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         } else {
             if (aID <= 0) mID = (short) aNBT.getInteger("mID");
             else mID = aID;
-            mSidedRedstone = aNBT.getByteArray("mRedstoneSided");
             mConnections = aNBT.getByte("mConnections");
             mColor = aNBT.getByte("mColor");
-            mStrongRedstone = aNBT.getByte("mStrongRedstone");
             mWorks = !aNBT.getBoolean("mWorks");
 
             if (mSidedRedstone.length != 6) mSidedRedstone = new byte[]{0, 0, 0, 0, 0, 0};
 
-            loadCoverNBT(aNBT);
+            readCoverNBT(aNBT);
             loadMetaTileNBT(aNBT);
         }
     }
@@ -203,10 +198,10 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
                     }
                 }
                 if (isServerSide() && mTickTimer > 10) {
-                    if (!doCoverThings()) 
+                    if (!doCoverThings())
                         return;
-                    
-                    byte oldConnections = mConnections;
+
+                    final byte oldConnections = mConnections;
                     // Mask-out connection direction bits to keep only Foam related connections
                     mConnections = (byte) (mMetaTileEntity.mConnections | (mConnections & ~IConnectable.CONNECTED_ALL));
                     // If foam not hardened, tries roll chance to harden
@@ -266,7 +261,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
             tTime = System.nanoTime() - tTime;
             if (mTimeStatistics.length > 0)
                 mTimeStatistics[mTimeStatisticsIndex = (mTimeStatisticsIndex + 1) % mTimeStatistics.length] = (int) tTime;
-            if (tTime > 0 && tTime > (GregTech_API.MILLISECOND_THRESHOLD_UNTIL_LAG_WARNING*1000000) && mTickTimer > 1000 && getMetaTileEntity().doTickProfilingMessageDuringThisTick() && mLagWarningCount++ < 10)
+            if (tTime > 0 && tTime > (GregTech_API.MILLISECOND_THRESHOLD_UNTIL_LAG_WARNING* 1000000L) && mTickTimer > 1000 && getMetaTileEntity().doTickProfilingMessageDuringThisTick() && mLagWarningCount++ < 10)
                 GT_FML_LOGGER.warn("WARNING: Possible Lag Source at ["+xCoord+","+yCoord+","+zCoord+"] in Dimension "+worldObj.provider.dimensionId+" with "+tTime+" ns caused by an instance of "+getMetaTileEntity().getClass());
         }
 
@@ -278,7 +273,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
             NW.sendPacketToAllPlayersInRange(
                 worldObj,
                 new GT_Packet_TileEntity(
-                    xCoord, (short) yCoord, zCoord, mID, mCoverSides[0], mCoverSides[1], mCoverSides[2], mCoverSides[3], mCoverSides[4], mCoverSides[5], oTextureData = mConnections, 
+                    xCoord, (short) yCoord, zCoord, mID, mCoverSides[0], mCoverSides[1], mCoverSides[2], mCoverSides[3], mCoverSides[4], mCoverSides[5], oTextureData = mConnections,
                     oUpdateData = hasValidMetaTileEntity() ? mMetaTileEntity.getUpdateData() : 0,
                     oRedstoneData = (byte) (((mSidedRedstone[0] > 0) ? 1 : 0) | ((mSidedRedstone[1] > 0) ? 2 : 0) | ((mSidedRedstone[2] > 0) ? 4 : 0) | ((mSidedRedstone[3] > 0) ? 8 : 0) | ((mSidedRedstone[4] > 0) ? 16 : 0) | ((mSidedRedstone[5] > 0) ? 32 : 0)),
                     oColor = mColor
@@ -287,12 +282,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
             mSendClientData = false;
         }
         sendCoverDataIfNeeded();
-    }
-
-    @Override
-    public Packet getDescriptionPacket() {
-        issueClientUpdate();
-        return null;
     }
 
     public final void receiveMetaTileEntityData(short aID, int aCover0, int aCover1, int aCover2, int aCover3, int aCover4, int aCover5, byte aTextureData, byte aUpdateData, byte aRedstoneData, byte aColorData) {
@@ -309,10 +298,10 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         setCoverIDAtSide((byte) 4, aCover4);
         setCoverIDAtSide((byte) 5, aCover5);
 
-        receiveClientEvent(MetaTileClientEvents.CHANGE_COMMON_DATA, aTextureData);
-        receiveClientEvent(MetaTileClientEvents.CHANGE_CUSTOM_DATA, aUpdateData);
-        receiveClientEvent(MetaTileClientEvents.CHANGE_COLOR, aColorData);
-        receiveClientEvent(MetaTileClientEvents.CHANGE_REDSTONE_OUTPUT, aRedstoneData);
+        receiveClientEvent(GregTechTileClientEvents.CHANGE_COMMON_DATA, aTextureData);
+        receiveClientEvent(GregTechTileClientEvents.CHANGE_CUSTOM_DATA, aUpdateData);
+        receiveClientEvent(GregTechTileClientEvents.CHANGE_COLOR, aColorData);
+        receiveClientEvent(GregTechTileClientEvents.CHANGE_REDSTONE_OUTPUT, aRedstoneData);
     }
 
     @Override
@@ -323,25 +312,24 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
             try {
                 mMetaTileEntity.receiveClientEvent((byte) aEventID, (byte) aValue);
             } catch (Throwable e) {
-                GT_Log.err.println("Encountered Exception while receiving Data from the Server, the Client should've been crashed by now, but I prevented that. Please report immediately to GregTech Intergalactical!!!");
-                e.printStackTrace(GT_Log.err);
+                GT_FML_LOGGER.error("Encountered Exception while receiving Data from the Server", e);
             }
         }
 
         if (isClientSide()) {
             issueTextureUpdate();
             switch (aEventID) {
-                case MetaTileClientEvents.CHANGE_COMMON_DATA:
+                case GregTechTileClientEvents.CHANGE_COMMON_DATA:
                     mConnections = (byte) aValue;
                     break;
-                case MetaTileClientEvents.CHANGE_CUSTOM_DATA:
+                case GregTechTileClientEvents.CHANGE_CUSTOM_DATA:
                     if (hasValidMetaTileEntity()) mMetaTileEntity.onValueUpdate((byte) aValue);
                     break;
-                case MetaTileClientEvents.CHANGE_COLOR:
+                case GregTechTileClientEvents.CHANGE_COLOR:
                     if (aValue > 16 || aValue < 0) aValue = 0;
                     mColor = (byte) aValue;
                     break;
-                case MetaTileClientEvents.CHANGE_REDSTONE_OUTPUT:
+                case GregTechTileClientEvents.CHANGE_REDSTONE_OUTPUT:
                     mSidedRedstone[0] = (byte) ((aValue & 1) == 1 ? 15 : 0);
                     mSidedRedstone[1] = (byte) ((aValue & 2) == 2 ? 15 : 0);
                     mSidedRedstone[2] = (byte) ((aValue & 4) == 4 ? 15 : 0);
@@ -349,15 +337,15 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
                     mSidedRedstone[4] = (byte) ((aValue & 16) == 16 ? 15 : 0);
                     mSidedRedstone[5] = (byte) ((aValue & 32) == 32 ? 15 : 0);
                     break;
-                case MetaTileClientEvents.DO_SOUND:
+                case GregTechTileClientEvents.DO_SOUND:
                     if (hasValidMetaTileEntity() && mTickTimer > 20)
                         mMetaTileEntity.doSound((byte) aValue, xCoord + 0.5, yCoord + 0.5, zCoord + 0.5);
                     break;
-                case MetaTileClientEvents.START_SOUND_LOOP:
+                case GregTechTileClientEvents.START_SOUND_LOOP:
                     if (hasValidMetaTileEntity() && mTickTimer > 20)
                         mMetaTileEntity.startSoundLoop((byte) aValue, xCoord + 0.5, yCoord + 0.5, zCoord + 0.5);
                     break;
-                case MetaTileClientEvents.STOP_SOUND_LOOP:
+                case GregTechTileClientEvents.STOP_SOUND_LOOP:
                     if (hasValidMetaTileEntity() && mTickTimer > 20)
                         mMetaTileEntity.stopSoundLoop((byte) aValue, xCoord + 0.5, yCoord + 0.5, zCoord + 0.5);
                     break;
@@ -367,7 +355,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     }
 
     public ArrayList<String> getDebugInfo(EntityPlayer aPlayer, int aLogLevel) {
-        ArrayList<String> tList = new ArrayList<String>();
+        final ArrayList<String> tList = new ArrayList<>();
         if (aLogLevel > 2) {
             tList.add("Meta-ID: " + EnumChatFormatting.BLUE+ mID +EnumChatFormatting.RESET + (hasValidMetaTileEntity() ? EnumChatFormatting.GREEN+" valid"+EnumChatFormatting.RESET : EnumChatFormatting.RED+" invalid"+EnumChatFormatting.RESET) + (mMetaTileEntity == null ? EnumChatFormatting.RED+" MetaTileEntity == null!"+EnumChatFormatting.RESET : " "));
         }
@@ -395,52 +383,11 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     }
 
     @Override
-    public void issueTextureUpdate() {
-        mNeedsUpdate = true;
-    }
-
-    @Override
-    public void issueBlockUpdate() {
-        mNeedsBlockUpdate = true;
-    }
-
-    @Override
-    public void issueClientUpdate() {
-        mSendClientData = true;
-    }
-
-    @Override
-    public void issueCoverUpdate(byte aSide) {
-        super.issueCoverUpdate(aSide);
-        issueClientUpdate();
-    }
-
-    @Override
-    public byte getStrongestRedstone() {
-        return (byte) Math.max(getInternalInputRedstoneSignal((byte) 0), Math.max(getInternalInputRedstoneSignal((byte) 1), Math.max(getInternalInputRedstoneSignal((byte) 2), Math.max(getInternalInputRedstoneSignal((byte) 3), Math.max(getInternalInputRedstoneSignal((byte) 4), getInternalInputRedstoneSignal((byte) 5))))));
-    }
-
-    @Override
-    public boolean getRedstone() {
-        return getRedstone((byte) 0) || getRedstone((byte) 1) || getRedstone((byte) 2) || getRedstone((byte) 3) || getRedstone((byte) 4) || getRedstone((byte) 5);
-    }
-
-    @Override
-    public boolean getRedstone(byte aSide) {
-        return getInternalInputRedstoneSignal(aSide) > 0;
-    }
-
-    @Override
     public boolean isGivingInformation() {
         if (canAccessData()) return mMetaTileEntity.isGivingInformation();
         return false;
     }
 
-    @Override
-    public boolean isValidFacing(byte aSide) {
-        if (canAccessData()) return mMetaTileEntity.isFacingValid(aSide);
-        return false;
-    }
 
     @Override
     public byte getBackFacing() {
@@ -675,23 +622,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     }
 
     @Override
-    public boolean increaseStoredSteam(long aEnergy, boolean aIgnoreTooMuchEnergy) {
-        return false;
-    }
-
-    @Override
-    public String[] getDescription() {
-        if (canAccessData()) return mMetaTileEntity.getDescription();
-        return new String[0];
-    }
-
-    @Override
-    public boolean isValidSlot(int aIndex) {
-        if (canAccessData()) return mMetaTileEntity.isValidSlot(aIndex);
-        return false;
-    }
-
-    @Override
     public long getUniversalEnergyStored() {
         return Math.max(getStoredEU(), getStoredSteam());
     }
@@ -711,15 +641,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         return 0;
     }
 
-    @Override
-    public long getStoredSteam() {
-        return 0;
-    }
-
-    @Override
-    public long getSteamCapacity() {
-        return 0;
-    }
 
     @Override
     public ITexture[] getTexture(Block aBlock, byte aSide) {
@@ -763,9 +684,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         return mMetaTileEntity != null && mMetaTileEntity.getBaseMetaTileEntity() == this;
     }
 
-    protected boolean canAccessData() {
-        return hasValidMetaTileEntity() && !isDead;
-    }
 
     @Override
     public void doExplosion(long aAmount) {
@@ -918,8 +836,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         try {
             if (!aPlayer.isSneaking() && hasValidMetaTileEntity()) return mMetaTileEntity.onRightclick(this, aPlayer, aSide, aX, aY, aZ);
         } catch (Throwable e) {
-            GT_Log.err.println("Encountered Exception while rightclicking TileEntity, the Game should've crashed now, but I prevented that. Please report immediately to GregTech Intergalactical!!!");
-            e.printStackTrace(GT_Log.err);
+            GT_FML_LOGGER.error("Encountered Exception while right clicking TileEntity", e);
         }
 
         return false;
@@ -930,8 +847,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         try {
             if (aPlayer != null && hasValidMetaTileEntity()) mMetaTileEntity.onLeftclick(this, aPlayer);
         } catch (Throwable e) {
-            GT_Log.err.println("Encountered Exception while leftclicking TileEntity, the Game should've crashed now, but I prevented that. Please report immediately to GregTech Intergalactical!!!");
-            e.printStackTrace(GT_Log.err);
+            GT_FML_LOGGER.error("Encountered Exception while left clicking TileEntity", e);
         }
     }
 
@@ -971,7 +887,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     public int[] getAccessibleSlotsFromSide(int aSide) {
         if (canAccessData() && (getCoverBehaviorAtSideNew((byte) aSide).letsItemsOut((byte) aSide, getCoverIDAtSide((byte) aSide), getComplexCoverDataAtSide((byte) aSide), -1, this) || getCoverBehaviorAtSideNew((byte) aSide).letsItemsIn((byte) aSide, getCoverIDAtSide((byte) aSide), getComplexCoverDataAtSide((byte) aSide), -1, this)))
             return mMetaTileEntity.getAccessibleSlotsFromSide(aSide);
-        return new int[0];
+        return GT_Values.emptyIntArray;
     }
 
     /**
@@ -996,36 +912,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     }
 
     @Override
-    public byte getInternalInputRedstoneSignal(byte aSide) {
-        return (byte) (getCoverBehaviorAtSideNew(aSide).getRedstoneInput(aSide, getInputRedstoneSignal(aSide), getCoverIDAtSide(aSide), getComplexCoverDataAtSide(aSide), this) & 15);
-    }
-
-    @Override
-    public byte getInputRedstoneSignal(byte aSide) {
-        return (byte) (worldObj.getIndirectPowerLevelTo(getOffsetX(aSide, 1), getOffsetY(aSide, 1), getOffsetZ(aSide, 1), aSide) & 15);
-    }
-
-    @Override
-    public byte getOutputRedstoneSignal(byte aSide) {
-        return (byte) (getCoverBehaviorAtSideNew(aSide).manipulatesSidedRedstoneOutput(aSide, getCoverIDAtSide(aSide), getComplexCoverDataAtSide(aSide), this) || (getCoverBehaviorAtSideNew(aSide).letsRedstoneGoOut(aSide, getCoverIDAtSide(aSide), getComplexCoverDataAtSide(aSide), this)) ? mSidedRedstone[aSide] & 15 : 0);
-    }
-
-    @Override
-    public void setInternalOutputRedstoneSignal(byte aSide, byte aStrength) {
-        if (!getCoverBehaviorAtSideNew(aSide).manipulatesSidedRedstoneOutput(aSide, getCoverIDAtSide(aSide), getComplexCoverDataAtSide(aSide), this))
-            setOutputRedstoneSignal(aSide, aStrength);
-    }
-
-    @Override
-    public void setOutputRedstoneSignal(byte aSide, byte aStrength) {
-        aStrength = (byte) Math.min(Math.max(0, aStrength), 15);
-        if (aSide >= 0 && aSide < 6 && mSidedRedstone[aSide] != aStrength) {
-            mSidedRedstone[aSide] = aStrength;
-            issueBlockUpdate();
-        }
-    }
-
-    @Override
     public boolean isSteamEngineUpgradable() {
         return isUpgradable() && !hasSteamEngineUpgrade() && getSteamCapacity() > 0;
     }
@@ -1045,13 +931,8 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     }
 
     @Override
-    public boolean hasInventoryBeenModified() {
-        return mInventoryChanged;
-    }
-
-    @Override
     public void setGenericRedstoneOutput(boolean aOnOff) {
-        //
+        // Do nothing
     }
 
     @Override
@@ -1115,17 +996,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     }
 
     @Override
-    public byte getStrongOutputRedstoneSignal(byte aSide) {
-        return aSide >= 0 && aSide < 6 && (mStrongRedstone & (1 << aSide)) != 0 ? (byte) (mSidedRedstone[aSide] & 15) : 0;
-    }
-
-    @Override
-    public void setStrongOutputRedstoneSignal(byte aSide, byte aStrength) {
-        mStrongRedstone |= (1 << aSide);
-        setOutputRedstoneSignal(aSide, aStrength);
-    }
-
-    @Override
     public ItemStack decrStackSize(int aIndex, int aAmount) {
         if (canAccessData()) {
             mInventoryChanged = true;
@@ -1156,7 +1026,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
         if (!canAccessData() || getCoverIDAtSide(aSide) != 0) return false;
         return mMetaTileEntity.injectRotationalEnergy(aSide, aSpeed, aEnergy);
     }
-    
+
     private boolean canMoveFluidOnSide(ForgeDirection aSide, Fluid aFluid, boolean isFill) {
         if (aSide == ForgeDirection.UNKNOWN)
             return true;
@@ -1215,7 +1085,7 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     @Override
     public FluidTankInfo[] getTankInfo(ForgeDirection aSide) {
         if (canAccessData()
-            && (aSide == ForgeDirection.UNKNOWN 
+            && (aSide == ForgeDirection.UNKNOWN
                 || (mMetaTileEntity.isLiquidInput((byte) aSide.ordinal())
                     && getCoverBehaviorAtSideNew((byte) aSide.ordinal()).letsFluidIn((byte) aSide.ordinal(), getCoverIDAtSide((byte) aSide.ordinal()), getComplexCoverDataAtSide((byte) aSide.ordinal()), null, this))
                 || (mMetaTileEntity.isLiquidOutput((byte) aSide.ordinal()) && getCoverBehaviorAtSideNew((byte) aSide.ordinal()).letsFluidOut((byte) aSide.ordinal(), getCoverIDAtSide((byte) aSide.ordinal()), getComplexCoverDataAtSide((byte) aSide.ordinal()), null, this))
@@ -1224,11 +1094,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
             )
             return mMetaTileEntity.getTankInfo(aSide);
         return new FluidTankInfo[]{};
-    }
-
-    @Override
-    public boolean isInvalidTileEntity() {
-        return isInvalid();
     }
 
     @Override
@@ -1313,12 +1178,6 @@ public class BaseMetaPipeEntity extends CoverableGregTechTileEntity implements I
     @Override
     public byte getConnections() {
         return mConnections;
-    }
-
-    @Override
-    public void markDirty() {
-        super.markDirty();
-        mInventoryChanged = true;
     }
 
     public void onNeighborBlockChange(int aX, int aY, int aZ) {

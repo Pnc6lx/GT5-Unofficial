@@ -119,7 +119,7 @@ public abstract class GT_MetaTileEntity_EnhancedMultiBlockBase<T extends GT_Meta
 	}
 
 	protected GT_Multiblock_Tooltip_Builder getTooltip() {
-		int tId = getBaseMetaTileEntity().getMetaTileID();
+		final int tId = getBaseMetaTileEntity().getMetaTileID();
 		GT_Multiblock_Tooltip_Builder tooltip = tooltips.get(tId);
 		if (tooltip == null) {
 			tooltip = createTooltip();
