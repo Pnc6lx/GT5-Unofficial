@@ -304,14 +304,14 @@ public class GT_Utility {
     }
 
     public static Object callConstructor(String aClass, int aConstructorIndex, Object aReplacementObject, boolean aLogErrors, Object... aParameters) {
-        try { 
+        try {
             return callConstructor(Class.forName(aClass), aConstructorIndex, aReplacementObject, aLogErrors, aParameters);
         } catch (Throwable e) {
             if (aLogErrors) e.printStackTrace(GT_Log.err);
         }
         return aReplacementObject;
     }
-    
+
     public static Object callConstructor(Class<?> aClass, int aConstructorIndex, Object aReplacementObject, boolean aLogErrors, Object... aParameters) {
         if (aConstructorIndex < 0) {
             try {
@@ -751,7 +751,7 @@ public class GT_Utility {
     private static byte moveOneItemStack(IInventory aTileEntity1, Object aTileEntity2, byte aGrabFrom, byte aPutTo, List<ItemStack> aFilter, boolean aInvertFilter, byte aMaxTargetStackSize, byte aMinTargetStackSize, byte aMaxMoveAtOnce, byte aMinMoveAtOnce, boolean aDoCheckChests) {
         if (aTileEntity1 == null || aMaxTargetStackSize <= 0 || aMinTargetStackSize <= 0 || aMaxMoveAtOnce <= 0 || aMinTargetStackSize > aMaxTargetStackSize || aMinMoveAtOnce > aMaxMoveAtOnce)
             return 0;
-            
+
         int[] tGrabSlots = null;
         if (aTileEntity1 instanceof ISidedInventory)
             tGrabSlots = ((ISidedInventory) aTileEntity1).getAccessibleSlotsFromSide(aGrabFrom);
@@ -971,8 +971,8 @@ public class GT_Utility {
     }
 
     public static boolean areStacksEqual(ItemStack aStack1, ItemStack aStack2, boolean aIgnoreNBT) {
-        return aStack1 != null && aStack2 != null && aStack1.getItem() == aStack2.getItem() 
-            && (aIgnoreNBT || (((aStack1.getTagCompound() == null) == (aStack2.getTagCompound() == null)) && (aStack1.getTagCompound() == null || aStack1.getTagCompound().equals(aStack2.getTagCompound())))) 
+        return aStack1 != null && aStack2 != null && aStack1.getItem() == aStack2.getItem()
+            && (aIgnoreNBT || (((aStack1.getTagCompound() == null) == (aStack2.getTagCompound() == null)) && (aStack1.getTagCompound() == null || aStack1.getTagCompound().equals(aStack2.getTagCompound()))))
             && (Items.feather.getDamage(aStack1) == Items.feather.getDamage(aStack2) || Items.feather.getDamage(aStack1) == W || Items.feather.getDamage(aStack2) == W);
     }
 
@@ -1239,7 +1239,7 @@ public class GT_Utility {
 
             if (tList == null) return false;
             if (aInput != null && !tEntry.getKey().matches(aInput)) return false;
-            
+
             return tList.stream().anyMatch(tOutput -> (aOutput == null || areStacksEqual(GT_OreDictUnificator.get(tOutput), aOutput)));
         }));
     }
@@ -1339,7 +1339,7 @@ public class GT_Utility {
         if (isStackInvalid(aStack)) return 0;
         return itemToInt(aStack.getItem(), Items.feather.getDamage(aStack));
     }
-    
+
     public static int itemToInt(Item aItem, int aMeta) {
         return Item.getIdFromItem(aItem) | (aMeta << 16);
     }
@@ -2038,7 +2038,7 @@ public class GT_Utility {
 
         TileEntity tTileEntity = aWorld.getTileEntity(aX, aY, aZ);
 
-        Block tBlock = aWorld.getBlock(aX, aY, aZ);
+        final Block tBlock = aWorld.getBlock(aX, aY, aZ);
 
         tList.add(
                 "----- X: " + EnumChatFormatting.AQUA + formatNumbers(aX) + EnumChatFormatting.RESET +
@@ -2066,7 +2066,7 @@ public class GT_Utility {
             try {
                 if (tTileEntity instanceof IFluidHandler) {
                     rEUAmount += 500;
-                    FluidTankInfo[] tTanks = ((IFluidHandler) tTileEntity).getTankInfo(ForgeDirection.getOrientation(aSide));
+                    final FluidTankInfo[] tTanks = ((IFluidHandler) tTileEntity).getTankInfo(ForgeDirection.getOrientation(aSide));
                     if (tTanks != null) for (byte i = 0; i < tTanks.length; i++) {
                     tList.add(
                             GT_Utility.trans("167","Tank ") + i + ": " +
@@ -2100,7 +2100,7 @@ public class GT_Utility {
             }
             try {
                 if (tTileEntity instanceof IAlignmentProvider) {
-                    IAlignment tAlignment = ((IAlignmentProvider) tTileEntity).getAlignment();
+                    final IAlignment tAlignment = ((IAlignmentProvider) tTileEntity).getAlignment();
                     if (tAlignment != null) {
                         rEUAmount += 100;
                         tList.add(GT_Utility.trans("219", "Extended Facing: ") + EnumChatFormatting.GREEN + tAlignment.getExtendedFacing() + EnumChatFormatting.RESET);
@@ -2119,32 +2119,6 @@ public class GT_Utility {
                 if (D1) e.printStackTrace(GT_Log.err);
             }
             try {
-                if (tTileEntity instanceof ic2.api.energy.tile.IEnergyTile) {
-                    rEUAmount += 200;
-                    //aList.add(((ic2.api.energy.tile.IEnergyTile)tTileEntity).isAddedToEnergyNet()?"Added to E-net":"Not added to E-net! Bug?");
-                }
-            } catch (Throwable e) {
-                if (D1) e.printStackTrace(GT_Log.err);
-            }
-            try {
-                if (tTileEntity instanceof ic2.api.energy.tile.IEnergySink) {
-                    rEUAmount += 400;
-                    //aList.add("Demanded Energy: " + ((ic2.api.energy.tile.IEnergySink)tTileEntity).demandsEnergy());
-                    //tList.add("Max Safe Input: " + getTier(((ic2.api.energy.tile.IEnergySink)tTileEntity).getSinkTier()));
-                    //tList.add("Max Safe Input: " + ((ic2.api.energy.tile.IEnergySink)tTileEntity).getMaxSafeInput());
-                }
-            } catch (Throwable e) {
-                if (D1) e.printStackTrace(GT_Log.err);
-            }
-            try {
-                if (tTileEntity instanceof ic2.api.energy.tile.IEnergySource) {
-                    rEUAmount += 400;
-                    //aList.add("Max Energy Output: " + ((ic2.api.energy.tile.IEnergySource)tTileEntity).getMaxEnergyOutput());
-                }
-            } catch (Throwable e) {
-                if (D1) e.printStackTrace(GT_Log.err);
-            }
-            try {
                 if (tTileEntity instanceof ic2.api.energy.tile.IEnergyConductor) {
                     rEUAmount += 200;
                     tList.add(GT_Utility.trans("175","Conduction Loss: ") + EnumChatFormatting.YELLOW + ((ic2.api.energy.tile.IEnergyConductor) tTileEntity).getConductionLoss() + EnumChatFormatting.RESET);
@@ -2158,7 +2132,6 @@ public class GT_Utility {
                     tList.add(
                             GT_Utility.trans("176","Contained Energy: ") + EnumChatFormatting.YELLOW + formatNumbers(((ic2.api.tile.IEnergyStorage) tTileEntity).getStored()) + EnumChatFormatting.RESET + " EU / " +
                                     EnumChatFormatting.YELLOW + formatNumbers(((ic2.api.tile.IEnergyStorage) tTileEntity).getCapacity()) + EnumChatFormatting.RESET + " EU");
-                    //aList.add(((ic2.api.tile.IEnergyStorage)tTileEntity).isTeleporterCompatible(ic2.api.Direction.YP)?"Teleporter Compatible":"Not Teleporter Compatible");
                 }
             } catch (Throwable e) {
                 if (D1) e.printStackTrace(GT_Log.err);
@@ -2191,7 +2164,7 @@ public class GT_Utility {
             try {
                 if (tTileEntity instanceof ICoverable) {
                     rEUAmount += 300;
-                    String tString = ((ICoverable) tTileEntity).getCoverBehaviorAtSideNew((byte) aSide).getDescription((byte) aSide, ((ICoverable) tTileEntity).getCoverIDAtSide((byte) aSide), ((ICoverable) tTileEntity).getComplexCoverDataAtSide((byte) aSide), (ICoverable) tTileEntity);
+                    final String tString = ((ICoverable) tTileEntity).getCoverBehaviorAtSideNew((byte) aSide).getDescription((byte) aSide, ((ICoverable) tTileEntity).getCoverIDAtSide((byte) aSide), ((ICoverable) tTileEntity).getComplexCoverDataAtSide((byte) aSide), (ICoverable) tTileEntity);
                     if (tString != null && !tString.equals(E)) tList.add(tString);
                 }
             } catch (Throwable e) {
@@ -2229,7 +2202,7 @@ public class GT_Utility {
             try {
                 if (tTileEntity instanceof ic2.api.crops.ICropTile) {
                     rEUAmount += 1000;
-                    ic2.api.crops.ICropTile crop = (ic2.api.crops.ICropTile) tTileEntity;
+                    final ic2.api.crops.ICropTile crop = (ic2.api.crops.ICropTile) tTileEntity;
                     if (crop.getScanLevel() < 4)
                         crop.setScanLevel((byte) 4);
                     if (crop.getCrop() != null) {
@@ -2249,11 +2222,11 @@ public class GT_Utility {
                         + GT_Utility.trans("197","  Air-Quality: ") + crop.getAirQuality()
                     );
                     if (crop.getCrop() != null) {
-                        StringBuilder tStringB = new StringBuilder();
+                        final StringBuilder tStringB = new StringBuilder();
                         for (String tAttribute : crop.getCrop().attributes()) {
                             tStringB.append(", ").append(tAttribute);
                         }
-                        String tString = tStringB.toString();
+                        final String tString = tStringB.toString();
                         tList.add(GT_Utility.trans("198","Attributes:") + tString.replaceFirst(",", E));
                         tList.add(GT_Utility.trans("199","Discovered by: ") + crop.getCrop().discoveredBy());
                     }
@@ -2263,9 +2236,9 @@ public class GT_Utility {
             }
         }
 
-        Chunk currentChunk = aWorld.getChunkFromBlockCoords(aX, aZ);
+        final Chunk currentChunk = aWorld.getChunkFromBlockCoords(aX, aZ);
         if (aPlayer.capabilities.isCreativeMode) {
-            FluidStack tFluid = undergroundOilReadInformation(currentChunk);//-# to only read
+            final FluidStack tFluid = undergroundOilReadInformation(currentChunk);//-# to only read
             if (tFluid!=null)
             	tList.add(EnumChatFormatting.GOLD + tFluid.getLocalizedName() + EnumChatFormatting.RESET + ": " + EnumChatFormatting.YELLOW + formatNumbers(tFluid.amount) + EnumChatFormatting.RESET + " L");
             else
@@ -2281,14 +2254,14 @@ public class GT_Utility {
         try {
             if (tBlock instanceof IDebugableBlock) {
                 rEUAmount += 500;
-                ArrayList<String> temp = ((IDebugableBlock) tBlock).getDebugInfo(aPlayer, aX, aY, aZ, 3);
+                final ArrayList<String> temp = ((IDebugableBlock) tBlock).getDebugInfo(aPlayer, aX, aY, aZ, 3);
                 if (temp != null) tList.addAll(temp);
             }
         } catch (Throwable e) {
             if (D1) e.printStackTrace(GT_Log.err);
         }
 
-        BlockScanningEvent tEvent = new BlockScanningEvent(aWorld, aPlayer, aX, aY, aZ, (byte) aSide, aScanLevel, tBlock, tTileEntity, tList, aClickX, aClickY, aClickZ);
+        final BlockScanningEvent tEvent = new BlockScanningEvent(aWorld, aPlayer, aX, aY, aZ, (byte) aSide, aScanLevel, tBlock, tTileEntity, tList, aClickX, aClickY, aClickZ);
         tEvent.mEUCost = rEUAmount;
         MinecraftForge.EVENT_BUS.post(tEvent);
         if (!tEvent.isCanceled()) aList.addAll(tList);
@@ -2376,7 +2349,7 @@ public class GT_Utility {
         }
         return -1;
     }
-	
+
     private static DecimalFormat getDecimalFormat(){
         return decimalFormatters.computeIfAbsent(Locale.getDefault(Locale.Category.FORMAT), locale -> {
             DecimalFormat numberFormat =new DecimalFormat();//uses the necessary locale inside anyway

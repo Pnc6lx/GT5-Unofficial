@@ -364,7 +364,7 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
         if (ignoreUnloadedChunks && crossedChunkBorder(aCoords) && !worldObj.blockExists(aCoords.posX, aCoords.posY, aCoords.posZ)) return Blocks.air;
         return worldObj.getBlock(aCoords.posX, aCoords.posY, aCoords.posZ);
     }
-    
+
     @Override
     public final byte getMetaID(int aX, int aY, int aZ) {
         if (ignoreUnloadedChunks && crossedChunkBorder(aX, aZ) && !worldObj.blockExists(aX, aY, aZ)) return 0;
@@ -404,7 +404,9 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
     @Override
     public final TileEntity getTileEntityAtSide(byte aSide) {
         if (aSide < 0 || aSide >= 6 || mBufferedTileEntities[aSide] == this) return null;
-        int tX = getOffsetX(aSide, 1), tY = getOffsetY(aSide, 1), tZ = getOffsetZ(aSide, 1);
+        final int tX = getOffsetX(aSide, 1);
+        final int tY = getOffsetY(aSide, 1);
+        final int tZ = getOffsetZ(aSide, 1);
         if (crossedChunkBorder(tX, tZ)) {
             mBufferedTileEntities[aSide] = null;
             if (ignoreUnloadedChunks && !worldObj.blockExists(tX, tY, tZ)) return null;
@@ -498,7 +500,7 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
     protected boolean crossedChunkBorder(int aX, int aZ) {
         return aX >> 4 != xCoord >> 4 || aZ >> 4 != zCoord >> 4;
     }
-    
+
     public final boolean crossedChunkBorder(ChunkCoordinates aCoords) {
         return aCoords.posX >> 4 != xCoord >> 4 || aCoords.posZ >> 4 != zCoord >> 4;
     }
@@ -510,9 +512,9 @@ public abstract class BaseTileEntity extends TileEntity implements IHasWorldObje
     public final void setToFire() {
         worldObj.setBlock(xCoord, yCoord, zCoord, Blocks.fire);
     }
-    
-    @Override 
-    public void markDirty() {/* Do not do the super Function */} 
+
+    @Override
+    public void markDirty() {/* Do not do the super Function */}
 
     @Deprecated
     public String trans(String aKey, String aEnglish){
