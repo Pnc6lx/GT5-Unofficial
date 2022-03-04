@@ -1,5 +1,6 @@
 package gregtech.api.enums;
 
+import gregtech.api.fluid.FluidTankGT;
 import gregtech.api.interfaces.internal.IGT_Mod;
 import gregtech.api.interfaces.internal.IGT_RecipeAdder;
 import gregtech.api.net.IGT_NetworkHandler;
@@ -7,6 +8,8 @@ import net.minecraft.item.ItemStack;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.world.World;
 import net.minecraftforge.fluids.FluidStack;
+import net.minecraftforge.fluids.FluidTankInfo;
+import net.minecraftforge.fluids.IFluidTank;
 import net.minecraftforge.oredict.OreDictionary;
 
 import java.util.HashSet;
@@ -195,36 +198,53 @@ public class GT_Values {
             RES_PATH_ASPECTS = MOD_ID + ":" + TEX_DIR_ASPECTS,
             RES_PATH_IC2 = MOD_ID_IC2.toLowerCase(Locale.ENGLISH) + ":",
             RES_PATH_MODEL = MOD_ID + ":" + TEX_DIR + "models/";
-    
-    /** 
-     * NBT String Keys 
+
+    /**
+     * NBT String Keys
      */
-    public static final String 
-        NBT_HIDDEN              = "gt.hidden",               // Boolean
-        NBT_MATERIAL            = "gt.material",             // String containing the Material Name.
-        NBT_COLOR               = "gt.color",                // Integer
-        NBT_MTE_REG             = "gt.mte.reg",              // Containing the MTE Registry ID
-        NBT_MTE_ID              = "gt.mte.id",               // Containing the MTE ID
-        NBT_DISPAY              = "gt.display",
-        NBT_FACING              = "gt.facing",
-        NBT_OWNER               = "gt.owner",
-        NBT_OWNER_UUID          = "gt.ownerUuid",
-        NBT_LOCK_UPGRADE        = "gt.locked",
-        NBT_CUSTOM_NAME         = "name",
-    
-        // MultiBlock
-        NBT_STRUCTURE_OK        = "gt.structure.ok",
-        NBT_ROTATION            = "gt.eRotation",
-        NBT_FLIP                = "gt.eFlip"
-    
-   ;
-    
+    public static class NBT {
+        public static final String
+            COLOR               = "gt.color",                // Integer
+            CUSTOM_NAME         = "name",                    // String
+            DISPAY              = "gt.display",              // String
+            FACING              = "gt.facing",               // Byte
+            HIDDEN              = "gt.hidden",               // Boolean
+            LOCK_UPGRADE        = "gt.locked",               // Boolean
+            MATERIAL            = "gt.material",             // String containing the Material Name.
+            MODE                = "gt.mode",                 // Number
+            MTE_ID              = "gt.mte.id",               // Containing the MTE ID
+            MTE_REG             = "gt.mte.reg",              // Containing the MTE Registry ID
+            OWNER               = "gt.owner",                // String
+            OWNER_UUID          = "gt.ownerUuid",            // UUID (String)
+
+            // Machines
+            FLUID_OUT           = "gt.fluidout",             // Output Fluid
+            INV_OUT             = "gt.invout",               // ItemStack
+            PARALLEL            = "gt.parallel",             // Number
+            TANK_CAPACITY       = "gt.tankcap",              // Number
+            TANK_IN             = "gt.tank.in.",             // FluidStack
+            TANK_OUT            = "gt.tank.out.",            // FluidStack
+            TEXTURE             = "gt.texture",              // String
+
+            // MultiBlock
+            STRUCTURE_OK        = "gt.structure.ok",
+            ROTATION            = "gt.eRotation",
+            FLIP                = "gt.eFlip",
+        	TARGET              = "gt.target",               // Boolean
+            TARGET_X            = "gt.target.x",             // Number
+            TARGET_Y            = "gt.target.y",             // Number
+            TARGET_Z            = "gt.target.z",             // Number
+
+            empty_              = "";
+    }
+
+
     public static final int UNCOLORED = 0x00ffffff;
-    
+
     /**
      * Sides
      */
-    public static final byte        
+    public static final byte
         SIDE_BOTTOM    = 0, SIDE_DOWN      = 0,
         SIDE_TOP       = 1, SIDE_UP        = 1,
         SIDE_NORTH     = 2, // Also a Side with a stupidly mirrored Texture
@@ -237,34 +257,34 @@ public class GT_Values {
     public static final byte[] COMPASS_DIRECTIONS = {SIDE_NORTH, SIDE_EAST, SIDE_SOUTH, SIDE_WEST};
 
 
-    /** 
-     * An Array containing all Sides which follow the Condition, in order to iterate over them for example. 
+    /**
+     * An Array containing all Sides which follow the Condition, in order to iterate over them for example.
      */
-    public static final byte[]              
+    public static final byte[]
         ALL_SIDES                    =  {0,1,2,3,4,5,6},
         ALL_VALID_SIDES              =  {0,1,2,3,4,5  };
 
     /**
-     * For Facing Checks.  
+     * For Facing Checks.
      */
-    
+
     public static final boolean[]
         INVALID_SIDES           = { false, false, false, false, false, false, true  },
         VALID_SIDES             = { true,  true,  true,  true,  true,  true,  false };
 
 
     /**
-     *  Side->Offset Mappings. 
+     *  Side->Offset Mappings.
      */
-    public static final byte[]              
+    public static final byte[]
         OFFX = { 0, 0, 0, 0,-1,+1, 0},
         OFFY = {-1,+1, 0, 0, 0, 0, 0},
         OFFZ = { 0, 0,-1,+1, 0, 0, 0};
 
     /**
-     *  Side->Opposite Mappings. 
+     *  Side->Opposite Mappings.
      **/
-    public static final byte[]             
+    public static final byte[]
         OPOS = { 1, 0, 3, 2, 5, 4, 6};
 
     /**
@@ -295,7 +315,7 @@ public class GT_Values {
      * Whether or not to place small ores as placer ores for an orevein
      */
     public static boolean oreveinPlacerOres;
-    /** 
+    /**
      * Multiplier to control how many placer ores get generated.
      */
     public static int oreveinPlacerOresMultiplier;
@@ -303,18 +323,18 @@ public class GT_Values {
      * How wide to look for oreveins that affect a requested chunk. Trying to use oreveins larger than this will not work correctly. Increasing the size will cause additional worldgenerator lag.
      * Disabled for now, using 64 in Deep Dark, 32 elsewhere
      */
-    // public static int oreveinMaxSize; 
+    // public static int oreveinMaxSize;
     /**
      * Not really Constants, but they set using the Config and therefore should be constant (those are for the Debug Mode)
      */
     public static boolean D1 = false, D2 = false;
     /**
      * Debug parameter for cleanroom testing.
-     */     
+     */
     public static boolean debugCleanroom = false;
     /**
      * Debug parameter for driller testing.
-     */     
+     */
     public static boolean debugDriller = false;
     /**
      * Debug parameter for world generation. Tracks chunks added/removed from run queue.
@@ -378,7 +398,7 @@ public class GT_Values {
     public static boolean cls_enabled;
     public static final Set<String> mCTMEnabledBlock = new HashSet<>();
     public static final Set<String> mCTMDisabledBlock = new HashSet<>();
-    
+
     public static boolean hideAssLineRecipes = false;
     public static boolean updateFluidDisplayItems = true;
     public static final int STEAM_PER_WATER = 160;
@@ -388,4 +408,9 @@ public class GT_Values {
     public static boolean disableDigitalChestsExternalAccess = false;
 
     public static final int[] emptyIntArray = new int[0];
+    public static final IFluidTank[] emptyFluidTank = new IFluidTank[0];
+    public static final FluidTankGT[] emptyFluidTankGT = new FluidTankGT[0];
+    public static final FluidTankInfo[] emptyFluidTankInfo = new FluidTankInfo[0];
+    public static final FluidStack[] emptyFluidStack = new FluidStack[0];
+    public static final ItemStack[] emptyItemStack = new ItemStack[0];
 }

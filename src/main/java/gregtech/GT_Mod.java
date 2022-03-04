@@ -201,6 +201,7 @@ public class GT_Mod implements IGT_Mod {
         new GT_Loader_ItemData().run();
         new GT_Loader_Item_Block_And_Fluid().run();
         new GT_Loader_MetaTileEntities().run();
+        new GT_Loader_MultiTileEntities().run();
 
         new GT_Loader_CircuitBehaviors().run();
         new GT_CoverBehaviorLoader().run();
@@ -292,7 +293,7 @@ public class GT_Mod implements IGT_Mod {
                 GT_Log.out.println("META " + i + " " + GregTech_API.METATILEENTITIES[i].getMetaName());
             }
         }
-        
+
         if (gregtechproxy.mSortToTheEnd) {
             gregtechproxy.registerUnificationEntries();
         } else {
@@ -343,7 +344,7 @@ public class GT_Mod implements IGT_Mod {
         }
         GT_ModHandler.removeRecipeByOutput(GT_ModHandler.getIC2Item("machine", 1L));
         GT_ModHandler.addCraftingRecipe(GT_ModHandler.getIC2Item("machine", 1L), GT_ModHandler.RecipeBits.BUFFERED | GT_ModHandler.RecipeBits.NOT_REMOVABLE | GT_ModHandler.RecipeBits.REVERSIBLE, new Object[]{"RRR", "RwR", "RRR", 'R', OrePrefixes.plate.get(Materials.Iron)});
-        
+
         GT_PostLoad.registerFluidCannerRecipes();
 
         if (Loader.isModLoaded(MOD_ID_FR)) {
@@ -375,7 +376,7 @@ public class GT_Mod implements IGT_Mod {
         MinecraftForge.EVENT_BUS.register(new GT_TooltipEventHandler());
         GT_LanguageManager.propagateLocalizationServerSide();
 
-        /* 
+        /*
          * Until this point most crafting recipe additions, and removals, have been buffered.
          * Go through, execute the removals in bulk, and then any deferred additions.  The bulk removals in particular significantly speed up the recipe list
          * modifications.
@@ -385,7 +386,7 @@ public class GT_Mod implements IGT_Mod {
         GT_Log.out.println("GT_Mod: Adding buffered Recipes.");
         GT_ModHandler.stopBufferingCraftingRecipes();
         GT_FML_LOGGER.info("Executed delayed Crafting Recipes (" + stopwatch.stop() + "). Have a Cake.");
-        
+
         GT_Log.out.println("GT_Mod: Saving Lang File.");
         GT_LanguageManager.sEnglishFile.save();
         GregTech_API.sPostloadFinished = true;
@@ -424,7 +425,7 @@ public class GT_Mod implements IGT_Mod {
         GregTech_API.sAfterGTLoad = null;
         GregTech_API.sBeforeGTPostload = null;
         GregTech_API.sAfterGTPostload = null;
-        
+
         GT_PostLoad.createGTtoolsCreativeTab();
     }
 

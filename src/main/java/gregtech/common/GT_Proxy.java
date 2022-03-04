@@ -1,6 +1,10 @@
 package gregtech.common;
 
-import cpw.mods.fml.common.*;
+import cpw.mods.fml.common.FMLCommonHandler;
+import cpw.mods.fml.common.IFuelHandler;
+import cpw.mods.fml.common.Loader;
+import cpw.mods.fml.common.ModContainer;
+import cpw.mods.fml.common.ProgressManager;
 import cpw.mods.fml.common.eventhandler.Event.Result;
 import cpw.mods.fml.common.eventhandler.SubscribeEvent;
 import cpw.mods.fml.common.gameevent.TickEvent;
@@ -11,8 +15,16 @@ import cpw.mods.fml.common.registry.GameRegistry;
 import forestry.api.genetics.AlleleManager;
 import gregtech.GT_Mod;
 import gregtech.api.GregTech_API;
-import gregtech.api.enums.*;
+import gregtech.api.enums.ConfigCategories;
+import gregtech.api.enums.Dyes;
+import gregtech.api.enums.GT_Values;
+import gregtech.api.enums.ItemList;
+import gregtech.api.enums.Materials;
+import gregtech.api.enums.OreDictNames;
+import gregtech.api.enums.OrePrefixes;
+import gregtech.api.enums.SubTag;
 import gregtech.api.enums.TC_Aspects.TC_AspectStack;
+import gregtech.api.enums.ToolDictNames;
 import gregtech.api.interfaces.IBlockOnWalkOver;
 import gregtech.api.interfaces.IProjectileItem;
 import gregtech.api.interfaces.internal.IGT_Mod;
@@ -21,8 +33,27 @@ import gregtech.api.interfaces.metatileentity.IMetaTileEntity;
 import gregtech.api.interfaces.tileentity.IGregTechTileEntity;
 import gregtech.api.items.GT_MetaGenerated_Item;
 import gregtech.api.items.GT_MetaGenerated_Tool;
-import gregtech.api.objects.*;
-import gregtech.api.util.*;
+import gregtech.api.objects.GT_ChunkManager;
+import gregtech.api.objects.GT_Fluid;
+import gregtech.api.objects.GT_FluidStack;
+import gregtech.api.objects.GT_ItemStack;
+import gregtech.api.objects.GT_UO_DimensionList;
+import gregtech.api.objects.ItemData;
+import gregtech.api.util.GT_BlockMap;
+import gregtech.api.util.GT_CLS_Compat;
+import gregtech.api.util.GT_ChunkAssociatedData;
+import gregtech.api.util.GT_ClientPreference;
+import gregtech.api.util.GT_CoverBehaviorBase;
+import gregtech.api.util.GT_LanguageManager;
+import gregtech.api.util.GT_Log;
+import gregtech.api.util.GT_ModHandler;
+import gregtech.api.util.GT_OreDictUnificator;
+import gregtech.api.util.GT_Recipe;
+import gregtech.api.util.GT_RecipeRegistrator;
+import gregtech.api.util.GT_Shaped_Recipe;
+import gregtech.api.util.GT_Shapeless_Recipe;
+import gregtech.api.util.GT_Utility;
+import gregtech.api.util.WorldSpawnedEventBuilder;
 import gregtech.common.entities.GT_Entity_Arrow;
 import gregtech.common.gui.GT_ContainerVolumetricFlask;
 import gregtech.common.gui.GT_GUIContainerVolumetricFlask;
@@ -54,16 +85,22 @@ import net.minecraft.util.MathHelper;
 import net.minecraft.world.ChunkCoordIntPair;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldSettings.GameType;
+import net.minecraft.world.chunk.Chunk;
 import net.minecraft.world.gen.feature.WorldGenMinable;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.ForgeEventFactory;
 import net.minecraftforge.event.entity.EntityJoinWorldEvent;
 import net.minecraftforge.event.entity.living.EnderTeleportEvent;
 import net.minecraftforge.event.entity.living.LivingEvent.LivingUpdateEvent;
-import net.minecraftforge.event.entity.player.*;
+import net.minecraftforge.event.entity.player.ArrowLooseEvent;
+import net.minecraftforge.event.entity.player.ArrowNockEvent;
+import net.minecraftforge.event.entity.player.ItemTooltipEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.event.terraingen.OreGenEvent;
 import net.minecraftforge.event.world.BlockEvent;
 import net.minecraftforge.event.world.ChunkDataEvent;
+import net.minecraftforge.event.world.ChunkWatchEvent;
 import net.minecraftforge.fluids.Fluid;
 import net.minecraftforge.fluids.FluidContainerRegistry;
 import net.minecraftforge.fluids.FluidRegistry;
@@ -77,13 +114,33 @@ import org.apache.commons.lang3.text.WordUtils;
 import java.io.File;
 import java.lang.reflect.InvocationTargetException;
 import java.text.DateFormat;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.ConcurrentModificationException;
+import java.util.Date;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.stream.Collectors;
 
-import static gregtech.api.enums.GT_Values.*;
+import static gregtech.GT_Mod.GT_FML_LOGGER;
+import static gregtech.api.enums.GT_Values.MOD_ID_RC;
+import static gregtech.api.enums.GT_Values.MOD_ID_TC;
+import static gregtech.api.enums.GT_Values.MOD_ID_TE;
+import static gregtech.api.enums.GT_Values.MOD_ID_TF;
+import static gregtech.api.enums.GT_Values.W;
+import static gregtech.api.enums.GT_Values.debugEntityCramming;
+import static gregtech.api.util.GT_Util.LAST_BROKEN_TILEENTITY;
 
 
 public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
@@ -273,7 +330,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
      * This makes cover tabs visible on GregTech machines
      */
     public boolean mCoverTabsVisible = true;
-    
+
     /**
      * This controls whether cover tabs display on the left (default) or right side of the UI
      */
@@ -295,7 +352,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
 
     // Locking
     public static ReentrantLock TICK_LOCK = new ReentrantLock();
-    
+
     private final ConcurrentMap<UUID, GT_ClientPreference> mClientPrefernces = new ConcurrentHashMap<>();
 
     static {
@@ -578,7 +635,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
 
         RecipeSorter.register("gregtech:shaped", GT_Shaped_Recipe.class, RecipeSorter.Category.SHAPED, "after:minecraft:shaped before:minecraft:shapeless");
         RecipeSorter.register("gregtech:shapeless", GT_Shapeless_Recipe.class, RecipeSorter.Category.SHAPELESS, "after:minecraft:shapeless");
-        
+
         // Register chunk manager with Forge
         GT_ChunkManager.init();
     }
@@ -1409,6 +1466,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
         }
     }
 
+    @SuppressWarnings("deprecated")
     public static void stepMaterialsVanilla(Collection<GT_Proxy.OreDictEventContainer> mEvents, ProgressManager.ProgressBar progressBar){
         int size = 5;
         int sizeStep = mEvents.size() / 20 - 1;
@@ -1417,7 +1475,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
             tEvent = i$.next();
             sizeStep--;
             if(sizeStep == 0) {
-                GT_Mod.GT_FML_LOGGER.info("Baking : " + size + "%", new Object[0]);
+                GT_FML_LOGGER.info("Baking : " + size + "%", new Object[0]);
                 sizeStep = mEvents.size()/20-1;
                 size += 5;
             }
@@ -1425,7 +1483,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
         }
         ProgressManager.pop(progressBar);
     }
-    
+
     @SubscribeEvent
     public void onLivingUpdate(LivingUpdateEvent aEvent) {
         if (aEvent.entityLiving.onGround) {
@@ -1450,9 +1508,14 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
         if (aEvent.side.isServer()) {
             if (aEvent.phase == TickEvent.Phase.START) {
                 TICK_LOCK.lock();
+
             } else {
                 TICK_LOCK.unlock();
             }
+
+            // Making sure it is being freed up in order to prevent exploits or Garbage Collection mishaps.
+            LAST_BROKEN_TILEENTITY.set(null);
+
         }
 
     }
@@ -1460,11 +1523,11 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
     @SubscribeEvent
     public void onWorldTickEvent(TickEvent.WorldTickEvent aEvent) {
         if(aEvent.world.provider.dimensionId == 0)
-            mTicksUntilNextCraftSound--;   
+            mTicksUntilNextCraftSound--;
         if (aEvent.side.isServer()) {
             if (this.mUniverse == null) {
                 this.mUniverse = aEvent.world;
-            }         
+            }
             if (this.isFirstServerWorldTick) {
                 File tSaveDiretory = getSaveDirectory();
                 if (tSaveDiretory != null) {
@@ -1793,16 +1856,16 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
             // If not check the ore dict
             rFuelValue = Math.max(rFuelValue, getOreDictNames(aFuel).stream().mapToInt(f -> oreDictBurnTimes.getOrDefault(f, 0)).max().orElse(0));
         }
-        
+
         // If we have something from the GT MetaGenerated_Item, ItemFuelValue, or OreDict return
         if (rFuelValue > 0) return rFuelValue;
-        
+
         // Otherwise, a few more checks
-        if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Blocks.wooden_button, 1)))    return 150; 
-        else if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Blocks.ladder, 1)))      return 100; 
-        else if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Items.sign, 1)))         return 600; 
-        else if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Items.wooden_door, 1)))  return 600; 
-        else if (GT_Utility.areStacksEqual(aFuel, ItemList.Block_MSSFUEL.get(1)))          return 150000; 
+        if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Blocks.wooden_button, 1)))    return 150;
+        else if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Blocks.ladder, 1)))      return 100;
+        else if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Items.sign, 1)))         return 600;
+        else if (GT_Utility.areStacksEqual(aFuel, new ItemStack(Items.wooden_door, 1)))  return 600;
+        else if (GT_Utility.areStacksEqual(aFuel, ItemList.Block_MSSFUEL.get(1)))          return 150000;
         else if (GT_Utility.areStacksEqual(aFuel, ItemList.Block_SSFUEL.get(1)))           return 100000;
 
         return 0;
@@ -1817,7 +1880,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
         return addFluid(aMaterial.mName.toLowerCase(Locale.ENGLISH), "molten.autogenerated", aMaterial.mDefaultLocalName, aMaterial,
                 aMaterial.mRGBa, 2, aMaterial.getGasTemperature(), GT_OreDictUnificator.get(OrePrefixes.cell, aMaterial, 1L), ItemList.Cell_Empty.get(1L), 1000);
     }
-    
+
     public Fluid addAutogeneratedMoltenFluid(Materials aMaterial) {
         return addFluid("molten." + aMaterial.mName.toLowerCase(Locale.ENGLISH), "molten.autogenerated", "Molten " + aMaterial.mDefaultLocalName, aMaterial,
                 aMaterial.mMoltenRGBa, 4, aMaterial.mMeltingPoint <= 0 ? 1000 : aMaterial.mMeltingPoint, GT_OreDictUnificator.get(OrePrefixes.cellMolten, aMaterial, 1L), ItemList.Cell_Empty.get(1L), 144);
@@ -1856,7 +1919,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
         }
         aMaterial.setHydroCrackedFluids(crackedFluids);
     }
-    
+
     public void addAutoGeneratedSteamCrackedFluids(Materials aMaterial){
         Fluid[] crackedFluids = new Fluid[3];
         String[] namePrefixes = { "lightlysteamcracked.", "moderatelysteamcracked.", "severelysteamcracked." };
@@ -1884,7 +1947,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
         }
         aMaterial.setSteamCrackedFluids(crackedFluids);
     }
-    
+
     public Fluid addFluid(String aName, String aLocalized, Materials aMaterial, int aState, int aTemperatureK) {
         return addFluid(aName, aLocalized, aMaterial, aState, aTemperatureK, null, null, 0);
     }
@@ -2028,13 +2091,13 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
     public void activateOreDictHandler() {
         this.mOreDictActivated = true;
         ProgressManager.ProgressBar progressBar = ProgressManager.push("Register materials", mEvents.size());
-        
+
         if (Loader.isModLoaded("betterloadingscreen")){
             GT_Values.cls_enabled = true;
             try {
                 GT_CLS_Compat.stepMaterialsCLS(mEvents, progressBar);
             } catch (IllegalAccessException | InvocationTargetException e) {
-                GT_Mod.GT_FML_LOGGER.catching(e);
+                GT_FML_LOGGER.catching(e);
             }
         }
         else
@@ -2062,7 +2125,7 @@ public abstract class GT_Proxy implements IGT_Mod, IGuiHandler, IFuelHandler {
         GT_UndergroundOil.migrate(event);
         GT_Pollution.migrate(event);
     }
-    
+
     @SubscribeEvent
     public void onBlockBreakSpeedEvent(PlayerEvent.BreakSpeed aEvent)
     {
